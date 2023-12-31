@@ -14,12 +14,9 @@ import (
 
 type App struct {
 	Router      *mux.Router
-	ClientTheDP *mongo.Client
-	Client34st  *mongo.Client
-	ClientUTB   *mongo.Client
-	TheDP       *mongo.Collection
-	_34st       *mongo.Collection
-	UTB         *mongo.Collection
+	clients     map[string]*mongo.Client
+	collections map[string]*mongo.Collection
+	uris        map[string]string
 }
 
 func (a *App) Initialize(user, password string) {
@@ -29,33 +26,22 @@ func (a *App) Initialize(user, password string) {
 		log.Fatal("Missing required environment variables")
 	}
 
-	uri_thedp := fmt.Sprintf("mongodb+srv://%s:%s@dp.5aehsyo.mongodb.net/?retryWrites=true&w=majority", user, password)
-	uri_34st := fmt.Sprintf("mongodb+srv://%s:%s@34st.rvmlxes.mongodb.net/?retryWrites=true&w=majority", user, password)
-	uri_utb := fmt.Sprintf("mongodb+srv://%s:%s@utb.rjdlubs.mongodb.net/?retryWrites=true&w=majority", user, password)
+	a.uris = make(map[string]string)
+	a.clients = make(map[string]*mongo.Client)
+	a.collections = make(map[string]*mongo.Collection)
 
-	var client *mongo.Client
-	var err error
+	a.uris["dp"] = fmt.Sprintf("mongodb+srv://%s:%s@dp.5aehsyo.mongodb.net/?retryWrites=true&w=majority", user, password)
+	a.uris["34st"] = fmt.Sprintf("mongodb+srv://%s:%s@34st.rvmlxes.mongodb.net/?retryWrites=true&w=majority", user, password)
+	a.uris["utb"] = fmt.Sprintf("mongodb+srv://%s:%s@utb.rjdlubs.mongodb.net/?retryWrites=true&w=majority", user, password)
 
-	client, err = mongo.Connect(context.TODO(), options.Client().ApplyURI(uri_thedp))
-	if err != nil {
-		log.Fatal(err)
+	for key, uri := range a.uris {
+		client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(uri))
+		if err != nil {
+			log.Fatal(err)
+		}
+		a.clients[key] = client
+		a.collections[key] = client.Database("Cluster").Collection("articles")
 	}
-	a.ClientTheDP = client
-	a.TheDP = a.ClientTheDP.Database("Cluster").Collection("articles")
-
-	client, err = mongo.Connect(context.TODO(), options.Client().ApplyURI(uri_34st))
-	if err != nil {
-		log.Fatal(err)
-	}
-	a.Client34st = client
-	a._34st = a.Client34st.Database("Cluster").Collection("articles")
-
-	client, err = mongo.Connect(context.TODO(), options.Client().ApplyURI(uri_utb))
-	if err != nil {
-		log.Fatal(err)
-	}
-	a.ClientUTB = client
-	a.UTB = a.ClientUTB.Database("Cluster").Collection("articles")
 
 	log.Default().Println("Connected!")
 
@@ -71,14 +57,10 @@ func (a *App) Run(addr string) {
 	log.Fatal(http.ListenAndServe(addr, a.Router))
 
 	defer func() {
-		if err := a.ClientTheDP.Disconnect(context.TODO()); err != nil {
-			log.Fatal(err)
-		}
-		if err := a.Client34st.Disconnect(context.TODO()); err != nil {
-			log.Fatal(err)
-		}
-		if err := a.ClientUTB.Disconnect(context.TODO()); err != nil {
-			log.Fatal(err)
+		for _, client := range a.clients {
+			if err := client.Disconnect(context.TODO()); err != nil {
+				log.Fatal(err)
+			}
 		}
 	}()
 }
@@ -87,20 +69,19 @@ func (a *App) getHealth(res http.ResponseWriter, req *http.Request) {
 	res.Header().Set("Content-Type", "application/json")
 
 	var result bson.M
-	if err := a.ClientTheDP.Database("Cluster").RunCommand(context.TODO(), bson.D{{"ping", 1}}).Decode(&result); err != nil {
-		Utils.Json(res, http.StatusOK, map[string]string{"message": "api.thedp.com: Error connection to TheDP database"})
-		panic(err)
-	}
-	if err := a.Client34st.Database("Cluster").RunCommand(context.TODO(), bson.D{{"ping", 1}}).Decode(&result); err != nil {
-		Utils.Json(res, http.StatusOK, map[string]string{"message": "api.thedp.com: Error connection to 34st database"})
-		panic(err)
-	}
-	if err := a.ClientUTB.Database("Cluster").RunCommand(context.TODO(), bson.D{{"ping", 1}}).Decode(&result); err != nil {
-		Utils.Json(res, http.StatusOK, map[string]string{"message": "api.thedp.com: Error connection to UTB database"})
-		panic(err)
+	for _, client := range a.clients {
+		if err := client.Database("Cluster").RunCommand(context.TODO(), bson.D{{"ping", 1}}).Decode(&result); err != nil {
+			Utils.Json(res, http.StatusOK, map[string]string{"message": "api.thedp.com: Error connection to TheDP database"})
+			log.Fatal(err)
+		}
 	}
 
 	Utils.Json(res, http.StatusOK, map[string]string{"message": "api.thedp.com: Up and running!"})
 
 	log.Default().Println("Health check successful.")
+}
+
+func (a *App) getRecent(res http.ResponseWriter, req *http.Request) {
+	res.Header().Set("Content-Type", "application/json")
+
 }
