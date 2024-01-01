@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/gorilla/mux"
 	"go.mongodb.org/mongo-driver/bson"
@@ -48,7 +49,8 @@ func (a *App) Initialize(user, password string) {
 	// routes
 	a.Router = mux.NewRouter()
 
-	a.Router.HandleFunc("/health", a.getHealth).Methods("GET")
+	a.Router.HandleFunc("/health", utils.Log(a.getHealth)).Methods("GET")
+	a.Router.HandleFunc("/{db}/articles/recent/{count}", utils.Log(a.getRecent)).Methods("GET")
 
 	log.Default().Println("Routes initialized.")
 }
@@ -71,17 +73,37 @@ func (a *App) getHealth(res http.ResponseWriter, req *http.Request) {
 	var result bson.M
 	for _, client := range a.clients {
 		if err := client.Database("Cluster").RunCommand(context.TODO(), bson.D{{"ping", 1}}).Decode(&result); err != nil {
-			Utils.Json(res, http.StatusOK, map[string]string{"message": "api.thedp.com: Error connection to TheDP database"})
+			utils.Json(res, http.StatusOK, map[string]string{"message": "api.thedp.com: Error connection to TheDP database"})
 			log.Fatal(err)
 		}
 	}
 
-	Utils.Json(res, http.StatusOK, map[string]string{"message": "api.thedp.com: Up and running!"})
-
-	log.Default().Println("Health check successful.")
+	utils.Json(res, http.StatusOK, map[string]string{"message": "api.thedp.com: Up and running!"})
 }
 
 func (a *App) getRecent(res http.ResponseWriter, req *http.Request) {
 	res.Header().Set("Content-Type", "application/json")
 
+	vars := mux.Vars(req)
+	db := vars["db"]
+	count, err := strconv.Atoi(vars["count"])
+	if err != nil {
+		utils.Json(res, http.StatusBadRequest, map[string]string{"message": "api.thedp.com: Invalid count"})
+		return
+	}
+
+	filter := bson.D{}
+	opts := options.Find().SetLimit(int64(count))
+	cursor, err := a.collections[db].Find(context.Background(), filter, opts)
+	if err != nil {
+		utils.Json(res, http.StatusInternalServerError, map[string]string{"message": "api.thedp.com: Error retrieving articles"})
+		return
+	}
+
+	var results []Article
+	if err = cursor.All(context.Background(), &results); err != nil {
+		log.Fatal(err)
+	}
+
+	utils.Json(res, http.StatusOK, results)
 }
