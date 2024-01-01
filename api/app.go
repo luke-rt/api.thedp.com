@@ -1,4 +1,4 @@
-package main
+package api
 
 import (
 	"context"
@@ -72,7 +72,7 @@ func (a *App) getHealth(res http.ResponseWriter, req *http.Request) {
 
 	var result bson.M
 	for _, client := range a.clients {
-		if err := client.Database("Cluster").RunCommand(context.TODO(), bson.D{{"ping", 1}}).Decode(&result); err != nil {
+		if err := client.Database("Cluster").RunCommand(context.TODO(), bson.D{{Key: "ping", Value: 1}}).Decode(&result); err != nil {
 			utils.Json(res, http.StatusOK, map[string]string{"message": "api.thedp.com: Error connection to TheDP database"})
 			log.Fatal(err)
 		}
@@ -106,4 +106,12 @@ func (a *App) getRecent(res http.ResponseWriter, req *http.Request) {
 	}
 
 	utils.Json(res, http.StatusOK, results)
+}
+
+func (a *App) getAuthors(res http.ResponseWriter, req *http.Request) {
+
+}
+
+func (a *App) getTags(res http.ResponseWriter, req *http.Request) {
+
 }

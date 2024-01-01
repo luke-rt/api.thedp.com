@@ -1,4 +1,4 @@
-package main
+package api
 
 type Article struct {
 	Id             string   `bson:"_id"`

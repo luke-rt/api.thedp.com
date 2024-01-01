@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/joho/godotenv"
+	"thedp.com/api/api"
 )
 
 func main() {
@@ -12,7 +13,7 @@ func main() {
 		log.Println("No .env file found")
 	}
 
-	a := App{}
+	a := api.App{}
 	a.Initialize(
 		os.Getenv("USER"),
 		os.Getenv("PASSWORD"),
