@@ -159,10 +159,10 @@ func TestGetBySlug(t *testing.T) {
 		t.Errorf("Expected 1 articles. Got %d\n", len(articles))
 	}
 
-	if articles.get(0).Slug == "penn-flu-clinic-2023-recap-vaccines" {
+	if articles[0].Slug == "penn-flu-clinic-2023-recap-vaccines" {
 		t.Log("Expected slug to be penn-flu-clinic-2023-recap-vaccines. Success")
 	} else {
-		t.Errorf("Expected slug to be penn-flu-clinic-2023-recap-vaccines. Got %s\n", articles.get(0).Slug)
+		t.Errorf("Expected slug to be penn-flu-clinic-2023-recap-vaccines. Got %s\n", articles[0].Slug)
 	}
 }
 func TestGetByNonexistentSlug(t *testing.T) {
