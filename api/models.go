@@ -28,10 +28,12 @@ type Article struct {
 	SstsPath       string     `bson:"sstsPath"`
 	Tags           []Tag      `bson:"tags"`
 	Authors        []Author   `bson:"authors"`
-	DominantMedia  Media      `bson:"dominantmedia"`
-	CTime          int        `bson:"ctime"`
-	MTime          int        `bson:"mtime"`
-	PTime          int        `bson:"ptime"`
+	// TODO: mongodb stores it as either a string or an empty array
+	// make mondodb just store empty, not an empty array
+	DominantMedia interface{} `bson:"dominantmedia"`
+	CTime         int         `bson:"ctime"`
+	MTime         int         `bson:"mtime"`
+	PTime         int         `bson:"ptime"`
 }
 
 type Tag struct {

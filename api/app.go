@@ -149,8 +149,12 @@ func (a *App) getArticles(res http.ResponseWriter, req *http.Request) {
 	}
 
 	// sort string
-	/* TODO: date formats in mongodb are not currently normalized
 	sortStrategy := req.URL.Query().Get("sort")
+	if sortStrategy == "popular" {
+		opts = opts.SetSort(bson.D{{Key: "hits", Value: -1}})
+	}
+	/* TODO: date formats in mongodb are not currently normalized
+	// can only sort by popularity for now
 	if sortStrategy == "" || sortStrategy == "new" {
 		opts = opts.SetSort(bson.D{{Key: "published_at", Value: -1}})
 	} else if sortStrategy == "old" {
@@ -162,18 +166,19 @@ func (a *App) getArticles(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 	*/
-	// count int
-	count := req.URL.Query().Get("count")
-	if count != "" {
-		count, err := strconv.Atoi(count)
+
+	// limit int
+	limit := req.URL.Query().Get("limit")
+	if limit != "" {
+		limit, err := strconv.Atoi(limit)
 		if err != nil {
-			utils.Json(res, http.StatusBadRequest, map[string]string{"message": "api.thedp.com: Invalid count"})
+			utils.Json(res, http.StatusBadRequest, map[string]string{"message": "api.thedp.com: Invalid limit. Must be int"})
 			return
 		}
-		opts = opts.SetLimit(int64(count))
+		opts = opts.SetLimit(int64(limit))
 	} else {
 		if len(filter) == 0 {
-			utils.Json(res, http.StatusBadRequest, map[string]string{"message": "api.thedp.com: If no filter parameters are specified, count must be specified"})
+			utils.Json(res, http.StatusBadRequest, map[string]string{"message": "api.thedp.com: If no filter parameters are specified, limit must be specified"})
 			return
 		}
 	}
