@@ -50,7 +50,7 @@ func (a *App) Initialize(user, password string) {
 	a.Router = mux.NewRouter()
 
 	a.Router.HandleFunc("/health", utils.Log(a.getHealth)).Methods("GET")
-	a.Router.HandleFunc("/{db}/articles/recent/{count}", utils.Log(a.getRecent)).Methods("GET")
+	a.Router.HandleFunc("/{db}/articles", utils.Log(a.getArticles)).Methods("GET")
 
 	log.Default().Println("Routes initialized.")
 }
@@ -81,19 +81,103 @@ func (a *App) getHealth(res http.ResponseWriter, req *http.Request) {
 	utils.Json(res, http.StatusOK, map[string]string{"message": "api.thedp.com: Up and running!"})
 }
 
-func (a *App) getRecent(res http.ResponseWriter, req *http.Request) {
+func (a *App) getArticles(res http.ResponseWriter, req *http.Request) {
 	res.Header().Set("Content-Type", "application/json")
 
 	vars := mux.Vars(req)
 	db := vars["db"]
-	count, err := strconv.Atoi(vars["count"])
-	if err != nil {
-		utils.Json(res, http.StatusBadRequest, map[string]string{"message": "api.thedp.com: Invalid count"})
-		return
-	}
 
 	filter := bson.D{}
-	opts := options.Find().SetLimit(int64(count))
+	opts := options.Find()
+
+	// slug string
+	slug := req.URL.Query().Get("slug")
+	if slug != "" {
+		slugQuery := bson.E{
+			Key:   "slug",
+			Value: slug,
+		}
+		filter = append(filter, slugQuery)
+	}
+
+	// authors string[]
+	authors := req.URL.Query()["author"]
+	if authors != nil {
+		arr := bson.A{}
+		for _, author := range authors {
+			arr = append(arr, bson.D{{
+				Key: "$elemMatch",
+				Value: bson.D{{
+					Key:   "slug",
+					Value: author,
+				}},
+			}},
+			)
+		}
+		authorsQuery := bson.E{
+			Key: "authors",
+			Value: bson.D{{
+				Key:   "$all",
+				Value: arr,
+			}},
+		}
+		filter = append(filter, authorsQuery)
+	}
+
+	// tags string[]
+	tags := req.URL.Query()["tag"]
+	if tags != nil {
+		arr := bson.A{}
+		for _, tag := range tags {
+			arr = append(arr, bson.D{{
+				Key: "$elemMatch",
+				Value: bson.D{{
+					Key:   "slug",
+					Value: tag,
+				}},
+			}},
+			)
+		}
+		tagsQuery := bson.E{
+			Key: "tags",
+			Value: bson.D{{
+				Key:   "$all",
+				Value: arr,
+			}},
+		}
+		filter = append(filter, tagsQuery)
+	}
+
+	// sort string
+	/* TODO: date formats in mongodb are not currently normalized
+	sortStrategy := req.URL.Query().Get("sort")
+	if sortStrategy == "" || sortStrategy == "new" {
+		opts = opts.SetSort(bson.D{{Key: "published_at", Value: -1}})
+	} else if sortStrategy == "old" {
+
+	} else if sortStrategy == "popular" {
+
+	} else {
+		utils.Json(res, http.StatusBadRequest, map[string]string{"message": "api.thedp.com: Invalid sorting strategy. Options are 'new', 'old', and 'popular'"})
+		return
+	}
+	*/
+	// count int
+	count := req.URL.Query().Get("count")
+	if count != "" {
+		count, err := strconv.Atoi(count)
+		if err != nil {
+			utils.Json(res, http.StatusBadRequest, map[string]string{"message": "api.thedp.com: Invalid count"})
+			return
+		}
+		opts = opts.SetLimit(int64(count))
+	} else {
+		if len(filter) == 0 {
+			utils.Json(res, http.StatusBadRequest, map[string]string{"message": "api.thedp.com: If no filter parameters are specified, count must be specified"})
+			return
+		}
+	}
+
 	cursor, err := a.collections[db].Find(context.Background(), filter, opts)
 	if err != nil {
 		utils.Json(res, http.StatusInternalServerError, map[string]string{"message": "api.thedp.com: Error retrieving articles"})
@@ -106,12 +190,4 @@ func (a *App) getRecent(res http.ResponseWriter, req *http.Request) {
 	}
 
 	utils.Json(res, http.StatusOK, results)
-}
-
-func (a *App) getAuthors(res http.ResponseWriter, req *http.Request) {
-
-}
-
-func (a *App) getTags(res http.ResponseWriter, req *http.Request) {
-
 }
